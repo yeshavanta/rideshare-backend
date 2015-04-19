@@ -3,8 +3,7 @@
  */
 
 var mongoose = require('mongoose');
-
-mongoose.connect('mongodb://localhost/ridesharedatabase',function(){
+mongoose.connect(process.env.MONGOLAB_URI || 'mongodb://localhost/ridesharedatabase',function(){
     console.log('Connected to the database');
 });
 
