@@ -4,7 +4,7 @@
 
 var db = require('../db');
 
-var customer = db.model({
+var customer = db.model('Customer',{
     customerNumber:Number,
     email:String,
     profile:String,

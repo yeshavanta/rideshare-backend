@@ -4,7 +4,7 @@
 
 var express = require('express');
 var app =  express();
-var Cusomter = require('./models/Customer');
+var Customer = require('./models/Customer');
 
 app.use(require('body-parser').json());
 app.use(function(req,res,next){
