@@ -84,7 +84,7 @@ app.post('/signuplogin',function(req,res,next){
                         objectToBeEncoded.iss ='foodpipe.in';
                         objectToBeEncoded.isMobile=1;
                         var token = jwt.encode(objectToBeEncoded,secretkey);
-                        res.json({token:token,data:'Welcome'});
+                        res.json({token:token,data:customer});
                     }
                 });
             }
