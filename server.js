@@ -5,6 +5,9 @@
 var express = require('express');
 var app =  express();
 var Customer = require('./models/Customer');
+var bcrypt = require('bcrypt');
+var jwt = require('jwt-simple');
+var secretkey = 'yeshavantagiridhar';
 
 app.use(require('body-parser').json());
 app.use(function(req,res,next){
