@@ -116,7 +116,7 @@ app.post('/signuplogin',function(req,res,next){
                         objectToBeEncoded.isMobile=1;
                         console.log('A Customer has been created with the following customer ID ',customerNumber);
                         var token = jwt.encode(objectToBeEncoded,secretkey);
-                        res.json({token:token,data:'Welcome'});
+                        res.json({token:token,data:customer});
                     }
                 })
             });
