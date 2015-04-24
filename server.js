@@ -5,9 +5,11 @@
 var express = require('express');
 var app =  express();
 var Customer = require('./models/Customer');
+var Ride = require('./models/Ride');
 var bcrypt = require('bcrypt');
 var jwt = require('jwt-simple');
 var secretkey = 'yeshavantagiridhar';
+var moment = require('moment');
 
 app.use(require('body-parser').json());
 app.use(function(req,res,next){
@@ -40,6 +42,14 @@ function getUniqueId(bits){
         var number = intformat(flakeidgen.next(),'dec');
         return number;
     }
+}
+/*
+ returns decoded token by extracting the token from header
+ */
+function getDecodedXAuthTokenFromHeader(req){
+    var encodedXAuthToken = req.header('X-Auth');
+    var decodedXAuthToken = jwt.decode(encodedXAuthToken,secretkey);
+    return decodedXAuthToken;
 }
 
 /*
@@ -125,4 +135,98 @@ app.post('/signuplogin',function(req,res,next){
         }
     })
 });
+/*
+Format of the date is YYYY-MM-DDTHH:MM:SS.000Z
 
+ db.rides.find({date:{'$gte':ISODate('2015-05-05T16:00:00.000Z'),'$lt':ISODate('2015-05-24T18:00:00.000Z')}})
+
+ {
+ source:String,
+ destination:String,
+ phoneNumber:String,
+ date:Date in the format of YYYY-MM-DD
+ time: time in the format of HH:MM:SS
+ }
+ */
+app.post('/postRide',function(req,res,next){
+    //var decodedToken = getDecodedXAuthTokenFromHeader(req);
+    //var customerNumber = decodedToken.customerNumber;
+    var customerNumber = 324506059;
+    var rideId = getUniqueId(32);
+    var dateString = req.body.date;
+    dateString = dateString+'T'+req.body.time+'.000Z';
+    //var date = new Date('2015-04-22T12:42:00.000Z');
+    var date = new Date(dateString);
+
+    var source = req.body.source;
+    var destination = req.body.destination;
+    var phoneNumber = req.body.phoneNumber;
+
+    var ride = new Ride({
+        customerNumber:customerNumber,
+        rideId:rideId,
+        source:source,
+        destination:destination,
+        phoneNumber:phoneNumber,
+        date:date
+    });
+
+    ride.save(function(err,ride){
+        if(err){
+            res.sendStatus(500);
+        }else if(ride){
+            console.log('The ride is successfully posted');
+            res.sendStatus(200);
+        }
+    });
+
+})
+/*
+ {
+ "timeChoice":"both/today/tomorrow",
+ "source":"kormangala",
+ "destination":"hassan"
+ }
+ */
+
+app.post('/getRides',function(req,res,next){
+    var source = req.body.source;
+    var dest = req.body.destination;
+    var todayOrTomo = req.body.timeChoice;
+    var dateToday = moment().format('YYYY-MM-DD');
+    var nextDay = moment().add(1,'d').format('YYYY-MM-DD');
+    if(todayOrTomo === 'today'){
+        Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T00:00:00.000Z'}},function(err,rides){
+            if(err){
+                res.sendStatus(500);
+                console.log('Some error while retrieving the rides for this day');
+            }else if(rides){
+                console.log('Rides are successfully being returned')
+                res.json({rides:rides});
+            }
+        })
+    }else if(todayOrTomo === 'tomorrow'){
+        Ride.find({date:{'$gte':nextDay+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'}},function(err,rides){
+            if(err){
+                res.sendStatus(500);
+                console.log('Some error while retrieving the rides for this day');
+            }else if(rides){
+                console.log('Rides are successfully being returned for condition when todayOrTomo is equal to tomorrow')
+                res.json({rides:rides});
+            }
+        })
+    }else if(todayOrTomo === 'both'){
+        Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'}},function(err,rides){
+            if(err){
+                res.sendStatus(500);
+                console.log('Some error while retrieving the rides for this day');
+            }else if(rides){
+                console.log('Rides are successfully being returned for condition when todayOrTomo is equal to both')
+                res.json({rides:rides});
+            }
+        })
+    }else{
+        console.log('todayOrTomo did not match with any of the existing criteria')
+        res.sendStatus(500);
+    }
+})
