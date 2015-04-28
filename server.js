@@ -52,6 +52,20 @@ function getDecodedXAuthTokenFromHeader(req){
     return decodedXAuthToken;
 }
 
+function ensureAuthorized(req,res,next){
+    var encodedAuthToken = req.header('X-Auth');
+    var decodedToken = jwt.decode(encodedAuthToken,secretkey);
+    var customerNumber = decodedToken.customerNumber;
+
+    Customer.findOne(function(err,customer){
+        if(err){
+            res.sendStatus(403);
+            console.log('Customer with customer number '+customerNumber+' does not exist');
+        }else if(customer){
+            next();
+        }
+    })
+}
 /*
 All URLs start from this part of the page
  */
@@ -148,10 +162,10 @@ Format of the date is YYYY-MM-DDTHH:MM:SS.000Z
  time: time in the format of HH:MM:SS
  }
  */
-app.post('/postRide',function(req,res,next){
-    //var decodedToken = getDecodedXAuthTokenFromHeader(req);
-    //var customerNumber = decodedToken.customerNumber;
-    var customerNumber = 324506059;
+app.post('/postRide',ensureAuthorized,function(req,res,next){
+    var decodedToken = getDecodedXAuthTokenFromHeader(req);
+    var customerNumber = decodedToken.customerNumber;
+    //var customerNumber = 324506059;
     var rideId = getUniqueId(32);
     var dateString = req.body.date;
     dateString = dateString+'T'+req.body.time+'.000Z';
@@ -171,15 +185,30 @@ app.post('/postRide',function(req,res,next){
         date:date
     });
 
-    ride.save(function(err,ride){
-        if(err){
+    Ride.find({
+            customerNumber:customerNumber,
+            source:source,
+            destination:destination,
+            phoneNumber:phoneNumber,
+            date:date
+        },function(err,rides){
+        if(rides.length > 0){
+            res.sendStatus(409);
+            console.log('The ride already exists');
+        }else if(!rides){
+            ride.save(function(err,ride){
+                if(err){
+                    res.sendStatus(500);
+                }else if(ride){
+                    console.log('The ride is successfully posted');
+                    res.sendStatus(200);
+                }
+            });
+        }else if (err){
             res.sendStatus(500);
-        }else if(ride){
-            console.log('The ride is successfully posted');
-            res.sendStatus(200);
+            console.log('There was an error while accessing the Database');
         }
-    });
-
+    })
 })
 /*
  {
@@ -189,7 +218,7 @@ app.post('/postRide',function(req,res,next){
  }
  */
 
-app.post('/getRides',function(req,res,next){
+app.post('/getRides',ensureAuthorized,function(req,res,next){
     var source = req.body.source;
     var dest = req.body.destination;
     var todayOrTomo = req.body.timeChoice;
