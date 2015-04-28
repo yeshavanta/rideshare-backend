@@ -68,7 +68,7 @@ function ensureAuthorized(req,res,next){
 }
 /*
 All URLs start from this part of the page
- */
+*/
 
 app.get('/',function(req,res,next){
     res.sendfile('index.html')
@@ -161,15 +161,14 @@ Format of the date is YYYY-MM-DDTHH:MM:SS.000Z
  date:Date in the format of YYYY-MM-DD
  time: time in the format of HH:MM:SS
  }
+
  */
 app.post('/postRide',ensureAuthorized,function(req,res,next){
     var decodedToken = getDecodedXAuthTokenFromHeader(req);
     var customerNumber = decodedToken.customerNumber;
-    //var customerNumber = 324506059;
     var rideId = getUniqueId(32);
     var dateString = req.body.date;
     dateString = dateString+'T'+req.body.time+'.000Z';
-    //var date = new Date('2015-04-22T12:42:00.000Z');
     var date = new Date(dateString);
 
     var source = req.body.source;
@@ -210,14 +209,14 @@ app.post('/postRide',ensureAuthorized,function(req,res,next){
         }
     })
 })
+
 /*
  {
  "timeChoice":"both/today/tomorrow",
  "source":"kormangala",
  "destination":"hassan"
  }
- */
-
+*/
 app.post('/getRides',ensureAuthorized,function(req,res,next){
     var source = req.body.source;
     var dest = req.body.destination;
