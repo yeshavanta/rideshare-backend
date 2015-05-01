@@ -10,6 +10,8 @@ var bcrypt = require('bcrypt');
 var jwt = require('jwt-simple');
 var secretkey = 'yeshavantagiridhar';
 var moment = require('moment');
+var JoinedRide = require('./models/JoinedRide');
+var gcm = require('node-gcm');
 
 app.use(require('body-parser').json());
 app.use(function(req,res,next){
@@ -80,6 +82,8 @@ app.get('/',function(req,res,next){
  email:email,
  profile:(local/facebook/google),
  password:password
+ gcmId:send the gcmId once u obtain it from google, this is a one time thing, and
+ should send it when u are signing up
 }
  */
 app.post('/signuplogin',function(req,res,next){
@@ -122,7 +126,8 @@ app.post('/signuplogin',function(req,res,next){
                 customerNumber:customerNumber,
                 profile:profile,
                 email:email,
-                userid:req.body.userid
+                userid:req.body.userid,
+                gcmId:req.body.gcmId
             });
             bcrypt.hash(req.body.password,10,function(err,hash){
                 newCustomer.password = hash;
@@ -256,5 +261,110 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
     }else{
         console.log('todayOrTomo did not match with any of the existing criteria')
         res.sendStatus(500);
+    }
+})
+
+/*
+This api must be called when you are creating the ride
+customers:Array of customers
+ */
+app.post('/createJoinedRide',function(req,res,next){
+    var jrId = getUniqueId(32);
+    var customers = req.body.customers;
+    var joinedRide = new JoinedRide({
+        jrId:jrId,
+        customers:customers,
+        counter:0
+    });
+
+    joinedRide.save(function(err,joinedride){
+        if(err){
+            res.sendStatus(500);
+            console.log('Error in saving the joined ride, please try again later');
+        }else if(joinedride){
+            console.log('Successfully saved the joined ride, now returning the id')
+            res.json({joinedRideId:jrId});
+            /*
+            must send the notifications to all the people who are in the customers list,
+            that you are invited to join this ride and can press on start when they are
+            about to start the journey
+             */
+        }
+    })
+})
+
+/*
+requestingCustomer:requesting customer id
+targetCustomer:target customer ID
+jrId:may or may not exist
+ */
+app.post('/requestCustomerToJoinedRide',function(req,res,next){
+    var requestingCustomer = req.body.requestingCustomer;
+    var targetCustomer = req.body.targetCustomer;
+    if(req.body.jrId === undefined){
+        var jrId = getUniqueId(32);
+        var customers = [];
+        customers.push(requestingCustomer);
+        var joinedRide = new JoinedRide({
+            jrId:jrId,
+            customers:customers,
+            counter:0
+        });
+
+        joinedRide.save(function(err,joinedride){
+            if(err){
+                res.sendStatus(500);
+                console.log('Error in saving the joined ride, please try again later');
+            }else if(joinedride){
+                console.log('Successfully saved the joined ride, now returning the id')
+                res.json({joinedRideId:jrId});
+                /*
+                 must send the notifications to all the people who are in the customers list,
+                 that you are invited to join this ride and can press on start when they are
+                 about to start the journey
+                 */
+            }
+        })
+    }
+})
+
+/*
+jrId:jrId
+status:yes/no,
+requestingCustomer:customerNumber
+ */
+app.post('/acceptTheJoinedRide',function(req,res,next){
+    var decodedToken = getDecodedXAuthTokenFromHeader(req);
+    var customerNumber = decodedToken.customerNumber;
+    if(status === 'yes'){
+        //I have to send notification to the users, and update the ride
+        JoinedRide.update({jrId:req.body.jrId},{"$push":{customers:customerNumber}},function(err,numberAffected,raw){
+            if(err){
+                console.log('Error while updating the main order',err);
+                res.sendStatus(500)
+            }else if(numberAffected != 0){
+                console.log('The number of rows affected are ',numberAffected);
+                res.sendStatus(200);
+            }
+        })
+    }
+    else if(status === 'No'){
+        // I have to send notification to the requesting customer that this person has refused your request
+        var regId = req.body.gcmRegId;
+        var message = new gcm.Message({
+            collapseKey: 'demo',
+            delayWhileIdle: true,
+            timeToLive: 3,
+            data: {
+                messageKey: 'Sorry the user has denied your ride'
+            }
+        });
+        var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
+        var registrationIds = [];
+        registrationIds.push(regId);
+        sender.send(message,registrationIds,2,function(err,result){
+            if(err) console.error(err);
+            else    console.log(result);
+        })
     }
 })
