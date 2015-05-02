@@ -102,10 +102,10 @@ app.post('/signuplogin',function(req,res,next){
             }else{
                 bcrypt.compare(req.body.password,customer.password,function(err,valid){
                     if(err){
-                        res.json({data:'The user does not exist, please signup'});
+                        res.json({failure:'The user does not exist, please signup'});
                     }
                     else if(!valid){
-                        res.json({data:'The Username or password is not valid'});
+                        res.json({failure:'The Username or password is not valid'});
                     }else{
                         console.log('About to send the information back to customer');
                         var objectToBeEncoded = {};
@@ -134,7 +134,7 @@ app.post('/signuplogin',function(req,res,next){
                 newCustomer.save(function(err,customer){
                     if(err){
                         console.log('Error while saving the new customer to DB');
-                        res.sendStatus(500);
+                        res.json({failure:'Error while saving the new customer to DB'});
                     }else{
                         var objectToBeEncoded = {};
                         objectToBeEncoded.name = name;
@@ -197,19 +197,19 @@ app.post('/postRide',ensureAuthorized,function(req,res,next){
             date:date
         },function(err,rides){
         if(rides.length > 0){
-            res.sendStatus(409);
+            res.json({failure:'The ride already exists'});
             console.log('The ride already exists');
         }else if(!rides){
             ride.save(function(err,ride){
                 if(err){
-                    res.sendStatus(500);
+                    res.json({failure:'Error while saving the ride to DB'});
                 }else if(ride){
                     console.log('The ride is successfully posted');
-                    res.sendStatus(200);
+                    res.json({success:'The ride is successfully posted'});
                 }
             });
         }else if (err){
-            res.sendStatus(500);
+            res.json({failure:'Error while checking if the same ride exists'});
             console.log('There was an error while accessing the Database');
         }
     })
@@ -231,36 +231,36 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
     if(todayOrTomo === 'today'){
         Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T00:00:00.000Z'}},function(err,rides){
             if(err){
-                res.sendStatus(500);
+                res.json({failure:'Some error while retrieving the rides for today'});
                 console.log('Some error while retrieving the rides for this day');
             }else if(rides){
                 console.log('Rides are successfully being returned')
-                res.json({rides:rides});
+                res.json({success:'success',rides:rides});
             }
         })
     }else if(todayOrTomo === 'tomorrow'){
         Ride.find({date:{'$gte':nextDay+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'}},function(err,rides){
             if(err){
-                res.sendStatus(500);
+                res.json({failure:'Some error while retrieving the rides for tomo'});
                 console.log('Some error while retrieving the rides for this day');
             }else if(rides){
                 console.log('Rides are successfully being returned for condition when todayOrTomo is equal to tomorrow')
-                res.json({rides:rides});
+                res.json({success:'success',rides:rides});
             }
         })
     }else if(todayOrTomo === 'both'){
         Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'}},function(err,rides){
             if(err){
-                res.sendStatus(500);
+                res.json({failure:'Some error while retrieving the rides for both today and tomo'});
                 console.log('Some error while retrieving the rides for this day');
             }else if(rides){
                 console.log('Rides are successfully being returned for condition when todayOrTomo is equal to both')
-                res.json({rides:rides});
+                res.json({success:'success',rides:rides});
             }
         })
     }else{
         console.log('todayOrTomo did not match with any of the existing criteria')
-        res.sendStatus(500);
+        res.json({failure:'todayOrTomo did not match with any of the existing criteria'});
     }
 })
 
