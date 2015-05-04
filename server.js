@@ -13,6 +13,7 @@ var moment = require('moment');
 var JoinedRide = require('./models/JoinedRide');
 var gcm = require('node-gcm');
 var jsonwebtoken = require('jsonwebtoken');
+var https = require('https');
 
 app.use(require('body-parser').json());
 app.use(function(req,res,next){
@@ -85,6 +86,7 @@ app.get('/',function(req,res,next){
  password:password
  gcmId:send the gcmId once u obtain it from google, this is a one time thing, and
  should send it when u are signing up
+ token:token from g+ or facebook
 }
  */
 app.post('/signuplogin',function(req,res,next){
@@ -99,26 +101,59 @@ app.post('/signuplogin',function(req,res,next){
         }else if(customer){
             var profileFromDB = customer.profile;
             if(profileFromDB !== profile){
-                res.json({data:"User has already signed up with this email id using the profile: "+profileFromDB});
+                res.json({failure:'failure',data:"User has already signed up with this email id using the profile: "+profileFromDB});
             }else{
-                bcrypt.compare(req.body.password,customer.password,function(err,valid){
-                    if(err){
-                        res.json({failure:'The user does not exist, please signup'});
-                    }
-                    else if(!valid){
-                        res.json({failure:'The Username or password is not valid'});
-                    }else{
-                        console.log('About to send the information back to customer');
-                        var objectToBeEncoded = {};
-                        objectToBeEncoded.name = customer.name;
-                        objectToBeEncoded.customerNumber = customer.customerNumber;
-                        objectToBeEncoded.email = customer.email;
-                        objectToBeEncoded.iss ='foodpipe.in';
-                        objectToBeEncoded.isMobile=1;
-                        var token = jwt.encode(objectToBeEncoded,secretkey);
-                        res.json({token:token,data:customer});
-                    }
-                });
+                if(profile == 'facebook'){
+                    https.get('https://graph.facebook.com/app?access_token='+req.body.token,function(response){
+
+                        var body = '';
+                        response.on('data',function(d){
+                            body =body + d;
+                        })
+                        response.on('end',function(){
+                            console.log('Completely received the data '+body);
+                            var json = JSON.parse(body);
+                            if(json.error === undefined){
+                                if(json.name == 'foodpipe'){
+                                    var objectToBeEncoded = {};
+                                    objectToBeEncoded.name = customer.name;
+                                    objectToBeEncoded.customerNumber = customer.customerNumber;
+                                    objectToBeEncoded.email = customer.email;
+                                    objectToBeEncoded.iss ='foodpipe.in';
+                                    objectToBeEncoded.isMobile=1;
+                                    var token = jwt.encode(objectToBeEncoded,secretkey);
+                                    res.json({success:'success',token:token,data:customer});
+                                }
+                            }else{
+                                res.json({failure:'failure',data:'Unable to authenticate with the given token provided from you with facebook'})
+                            }
+                        })
+                    }).on('error',function(e){
+                        console.log('The shitty problem is: '+e);
+                    })
+
+                }else if( profile == 'google'){
+
+                }else{
+                    bcrypt.compare(req.body.password,customer.password,function(err,valid){
+                        if(err){
+                            res.json({failure:'The user does not exist, please signup'});
+                        }
+                        else if(!valid){
+                            res.json({failure:'The Username or password is not valid'});
+                        }else{
+                            console.log('About to send the information back to customer');
+                            var objectToBeEncoded = {};
+                            objectToBeEncoded.name = customer.name;
+                            objectToBeEncoded.customerNumber = customer.customerNumber;
+                            objectToBeEncoded.email = customer.email;
+                            objectToBeEncoded.iss ='foodpipe.in';
+                            objectToBeEncoded.isMobile=1;
+                            var token = jwt.encode(objectToBeEncoded,secretkey);
+                            res.json({token:token,data:customer});
+                        }
+                    });
+                }
             }
         }else if(!customer){
             var customerNumber = getUniqueId(32);
@@ -127,7 +162,6 @@ app.post('/signuplogin',function(req,res,next){
                 customerNumber:customerNumber,
                 profile:profile,
                 email:email,
-                userid:req.body.userid,
                 gcmId:req.body.gcmId
             });
             bcrypt.hash(req.body.password,10,function(err,hash){
