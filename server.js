@@ -12,6 +12,7 @@ var secretkey = 'yeshavantagiridhar';
 var moment = require('moment');
 var JoinedRide = require('./models/JoinedRide');
 var gcm = require('node-gcm');
+var jsonwebtoken = require('jsonwebtoken');
 
 app.use(require('body-parser').json());
 app.use(function(req,res,next){
@@ -61,7 +62,7 @@ function ensureAuthorized(req,res,next){
 
     Customer.findOne(function(err,customer){
         if(err){
-            res.sendStatus(403);
+            res.json({failure:'Custmer does not exist please sign up'});
             console.log('Customer with customer number '+customerNumber+' does not exist');
         }else if(customer){
             next();
@@ -199,7 +200,7 @@ app.post('/postRide',ensureAuthorized,function(req,res,next){
         if(rides.length > 0){
             res.json({failure:'The ride already exists'});
             console.log('The ride already exists');
-        }else if(!rides){
+        }else if(rides.length == 0){
             ride.save(function(err,ride){
                 if(err){
                     res.json({failure:'Error while saving the ride to DB'});
@@ -367,4 +368,23 @@ app.post('/acceptTheJoinedRide',function(req,res,next){
             else    console.log(result);
         })
     }
+})
+
+app.post('/generateToken',function(req,res,next){
+    var token = jsonwebtoken.sign({foo:'bar'},'shhhhhh');
+    res.json({token:token});
+})
+
+app.post('/verify',function(req,res,next){
+    console.log('received the request to verify token');
+    var token = req.body.token;
+    console.log('obtained the token: '+token);
+    jsonwebtoken.verify(token,'shhhhhh',function(err,decoded){
+        if(err){
+
+        };
+        if(decoded){
+           res.json({data:decoded});
+        }
+    });
 })

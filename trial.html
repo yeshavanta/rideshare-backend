@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+</head>
+
+<body ng-app='app'>
+
+<!--<div ng-controller='HttpController as httpctrl'>
+    <div>
+        <span ng-model='httpctrl.response'></span>
+    </div>
+    <div>
+        <button ng-click='httpctrl.makeCall()'>Make Call</button>
+    </div>
+
+</div>-->
+
+<div ng-controller='FileUploadController as fuploadctrl'>
+    <input type="file" name="file" onchange="angular.element(this).scope().uploadFile(this.files)"/>
+    <br />
+    <!--<input type='file' file-model="myFile" />
+    <button ng-click='fuploadctrl.uploadFile()'>Upload Me</button>-->
+</div>
+<div ng-controller='SocketController as sctrl'>
+    <div id="resultArena" ng-bind="sctrl.textarearesult"></div>
+    <button id="generateToken" ng-click="sctrl.generateToken()">generateToken</button>
+</div>
+
+<script src="bower_components/moment/moment.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.11/angular.min.js"></script>
+<script>
+
+    var app = angular.module('app',[]);
+    app.controller('HttpController',['$scope','$http',function($scope,$http){
+
+        var self = this;
+        var response;
+
+        this.makeCall = function(){
+            console.log('Inside the makeCall function');
+
+            var dataObjectForSignup ={
+                email:'hello1445@gmail.com',
+                fullname:'hello',
+                password:'rasengan',
+                mobile:'9986809811'
+            };
+
+            var dataObjectForTokenVerify ={
+                token:''
+            }
+            var req = {
+                method: 'POST',
+                url: 'http://localhost:3000/checkTokenExpiry',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Auth':'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJmb29kcGlwZS5pbiIsImV4cCI6MTQyMzE1MjMzNTk5OSwiZW1haWwiOiJsb3ZlbGxlc3NhZ2FpbkBnbWFpbC5jb20iLCJtb2JpbGUiOiI5NDQ4NDE1NzE1IiwibWVyY2hhbnROdW1iZXIiOjU5Njg3NzExNDc2MjAxNTUwMDB9.h9Lep3EFBrtcPqMoV1vX8UQ1fxCQZTy0oSm7vQ4L7Yw'
+                }
+                //data:dataObjectForTokenVerify
+            };
+
+            $http(req).then(function(response){
+                this.response = response.data.data;
+            });
+        }
+    }]).controller('FileUploadController',['$scope','$http',function($scope,$http){
+
+        $scope.uploadFile = function(files){
+            var file = files[0];
+            console.log('file is ',JSON.string(file));
+
+            $scope.uploadFile = function(files){
+                console.log('inside the upload file call');
+            }
+            var fd = new FormData();
+            fd.append("file",file);
+
+
+            $http.post('http://localhost:3000/uploadMenuUrl',fd,{
+                headers:{'Content-type':undefined},
+                transformRequest:angular.identity
+            }).success(function(){
+                console.log('Yaay File uploaded from the client side atleast');
+            }).error(function(){
+                console.log('Worst File wasn uploaded from the client side');
+            })
+
+
+        }
+
+    }]).controller('SocketController',['$http','$scope',function($http,$scope){
+        var self=this;
+        self.textarearesult = null;
+        self.loginobject={};
+        self.loginobject.email=null;
+        self.loginobject.password=null;
+
+        self.login = function(){
+            console.log('The obtained login details are as follows, email: '+self.loginobject.email+', password: '+self.loginobject.password)
+            $http.post('http://localhost:3000/login',self.loginobject)
+                    .success(function(data){
+                        console.log(data);
+                        $scope.$emit('loggedInAndObtainedMerchantNumber',data);
+                    }).error(function(data){
+                        console.log(data);
+                    })
+        }
+
+        self.getmenu = function(){
+            console.log('inside the get menu');
+            var req = {
+                method: 'POST',
+                url: 'http://localhost:3000/getMenu',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Auth':'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJmb29kcGlwZS5pbiIsImV4cCI6MTQyNDM3MDk2NTg0MiwiZW1haWwiOiJnaXJpQGdtYWlsLmNvbSIsIm1vYmlsZSI6Ijk3NDAzMzU4MTciLCJtZXJjaGFudE51bWJlciI6NTk3Mzg4MjQ1MTY0OTM2NDAwMH0.53Kk3-a9S_3sKzM968P7BCLZ-5zMMGRlOq6i3mBbNWw'
+
+                }
+            };
+
+            $http(req).success(function(data){
+                console.log(data);
+            }).error(function(data){
+                console.log(data);
+            })
+        }
+
+        self.generateToken = function(){
+            var jwt = require('jsonwebtoken');
+            var token = jwt.sign({foo:'bar'},'shhhhhh');
+            console.log(token);
+        }
+    }])
+
+</script>
+</body>
+</html>
