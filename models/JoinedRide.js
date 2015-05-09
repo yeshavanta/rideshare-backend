@@ -13,4 +13,5 @@ var joinedRide = db.model('joinedRide',{
     status:String
 });
 
+
 module.exports = joinedRide;

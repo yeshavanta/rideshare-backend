@@ -14,4 +14,5 @@ var ride = db.model('Ride',{
     status:String
 });
 
+
 module.exports = ride;
