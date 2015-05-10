@@ -1,6 +1,6 @@
 /**
  * Created by yash on 4/18/2015.
- */
+ * */
 
 var express = require('express');
 var app =  express();
@@ -277,7 +277,6 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
                         res.json({success:'success',rides:rides,jRides:jRides});
                     }
                 });
-
             }
         })
     }else if(todayOrTomo === 'tomorrow'){
@@ -362,8 +361,24 @@ app.post('/getMyRides',function(req,res,next){
     })
 })
 
-/*
+app.post('/removeAllCustomers',function(req,res,next){
+    Customer.remove({},function(err, numberofdocsremoved){
+        if(err){
+            console.log('error occured while removing a customer from DB');
+            res.sendStatus(500);
+        }
+        else {
+            console.log('Number of customer deleted are '+numberofdocsremoved);
+            res.sendStatus(200);
+        }
+    });
+})
 
+/*
+rideId:rideId(This can be a ride ID or a joined Ride id
+rideFlag: This flag is to tell whether the above ID is a rideId or a jrId
+ownerCustomerNumber: The customerNumber of the owner of the ride
+rRideId:The ride Id of the ride of which the customer is sending the request
  */
 app.post('/sendRequestToJoinTheRideOrJoinedRide',function(req,res,next){
     var ownerCustomerNumber = req.body.ownerCustomerNumber;
@@ -372,10 +387,12 @@ app.post('/sendRequestToJoinTheRideOrJoinedRide',function(req,res,next){
     // The ride ID can be that of joined ride or normal ride, we shall have a flag
     var rideId = req.body.rideId;
     var rideFlag = req.body.rideFlag;
+    var requestersRideId = req.body.rRideId;
     //Send a notification to the owner who has posted the ride
     Customer.find({customerNumber:{$in:[ownerCustomerNumber,requestingCustomerNumber]}},function(err,customers){
         var requester = {};
         var owner = {};
+        var requestersRide = {};
         if(err){
             console.log('Some error happened when the customers were being queried')
             res.sendStatus(500);
@@ -391,58 +408,98 @@ app.post('/sendRequestToJoinTheRideOrJoinedRide',function(req,res,next){
                 res.sendStatus(500);
             }
 
-            if(rideFlag === 'jride'){
-                JoinedRide.fineOne({jrId:rideId},function(err,joinedRide){
-                    if(err){
-                        res.sendStatus(500);
-                    }else if(joinedRide.length > 0){
-                        var regId = owner.gcmRegId;
-                        var message = new gcm.Message({
-                            collapseKey: 'demo',
-                            delayWhileIdle: true,
-                            timeToLive: 3,
-                            data: {
-                                NotificationType: 'request to join the ride',
-                                requestingCustomer: requester,
-                                RequestingRide:''
+            Ride.findOne({rideId:requestersRideId},function(err,rRide){
+                if(err){
+                    res.sendStatus(500);
+                    console.log('Shit happened while retrieving the requesters ride ride from DB');
+                }
+                if(rRide.length == 1){
+                    requestersRide = rRide;
+                    if(rideFlag === 'jride'){
+                        JoinedRide.fineOne({jrId:rideId},function(err,joinedRide){
+                            if(err){
+                                res.sendStatus(500);
+                            }else if(joinedRide.length > 0){
+                                var regId = owner.gcmRegId;
+                                var message = new gcm.Message({
+                                    collapseKey: 'demo',
+                                    delayWhileIdle: true,
+                                    timeToLive: 3,
+                                    data: {
+                                        NotificationType: 'request to join the ride',
+                                        requestingCustomer: requester,
+                                        requestersRide:requestersRide
+                                    }
+                                });
+                                var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
+                                var registrationIds = [];
+                                //registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
+                                registrationIds.push(regId);
+                                sender.send(message,registrationIds,2,function(err,result){
+                                    if(err) console.error(err);
+                                    else    console.log(result);
+                                })
                             }
-                        });
-                        var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
-                        var registrationIds = [];
-                        //registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
-                        registrationIds.push(regId);
-                        sender.send(message,registrationIds,2,function(err,result){
-                            if(err) console.error(err);
-                            else    console.log(result);
+                        })
+                    }else if(rideFlag === 'ride'){
+                        Ride.fineOne({rideId:rideId},function(err,ride){
+                            if(err){
+                                res.sendStatus(500);
+                            }else if(ride.length > 0){
+                                var regId = owner.gcmRegId;
+                                var message = new gcm.Message({
+                                    collapseKey: 'demo',
+                                    delayWhileIdle: true,
+                                    timeToLive: 3,
+                                    data: {
+                                        NotificationType: 'request to join the ride',
+                                        requestingCustomer: requester,
+                                        requestersRide:requestersRide
+                                    }
+                                });
+                                var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
+                                var registrationIds = [];
+                                //registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
+                                registrationIds.push(regId);
+                                sender.send(message,registrationIds,2,function(err,result){
+                                    if(err) console.error(err);
+                                    else    console.log(result);
+                                })
+                            }
+
                         })
                     }
-
-                })
-
-            }else if(rideFlag === 'ride'){
-                var regId = owner.gcmRegId;
-                var message = new gcm.Message({
-                    collapseKey: 'demo',
-                    delayWhileIdle: true,
-                    timeToLive: 3,
-                    data: {
-                        NotificationType: 'request to join the ride',
-                        requestingCustomer: '',
-                        RequestingRide:''
-                    }
-                });
-                var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
-                var registrationIds = [];
-                //registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
-                registrationIds.push(regId);
-                sender.send(message,registrationIds,2,function(err,result){
-                    if(err) console.error(err);
-                    else    console.log(result);
-                })
-            }
+                }else{
+                    res.json({failure:'failure',message:'there are multiple rides with same ride ID which is wrong'});
+                    console.log('there are multiple rides with same ride ID which is wrong');
+                }
+            })
         }
     })
 })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /*
 This api must be called when you are creating the ride
 customers:Array of customers
