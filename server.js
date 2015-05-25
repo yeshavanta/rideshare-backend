@@ -341,6 +341,7 @@ app.post('/getMyRides',function(req,res,next){
     var currentDate = moment().format('YYYY-MM-DD');
     var currentTime = moment().format('HH:mm:ss');
     var currentDateTimeString = currentDate+'T'+currentTime+'.000Z';
+    console.log('CurrentdateTimeString is: '+currentDateTimeString);
     var nextDayDate = moment().add(1,'d').format('YYYY-MM-DD');
     Ride.find({date:{'$gte':currentDateTimeString,'$lt':nextDayDate+'T23:59:59.000Z'},jrId:0,customerNumber:customerNumber},function(err,rides){
        if(err){
@@ -526,7 +527,7 @@ Steps involved are
     status:accept/reject
 }
  */
-app.post('/acceptTheRequestToJoin',function(req,res,next){
+app.post('/acceptOrRejectTheRequestToJoin',function(req,res,next){
     var rideId = req.body.rideId;
     var rideFlag = req.body.rideFlag;
     var ownerCustomerNumber = req.body.ownerCustomerNumber; // this is obtained from the token
@@ -628,8 +629,37 @@ app.post('/acceptTheRequestToJoin',function(req,res,next){
             }
         })
     }else{
-            Customer.findOne({customerNumber:requesterCustomerNumber},function(){
+            Customer.findOne({customerNumber:requesterCustomerNumber},function(err, customer){
+                if(err){
+                    console.log('There was an error while retrieving the customer from Db: '+err);
+                    res.sendStatus(500);
+                }else if (customer.lenth > 0){
 
+                    var message = new gcm.Message({
+                        collapseKey: 'demo',
+                        delayWhileIdle: true,
+                        timeToLive: 3,
+                        data: {
+                            NotificationType: 'reject the request to join the ride',
+                            rideid:rideId,
+                            rideFlag:rideFlag,
+                            message:'The owner of this ride has rejected your request to join the ride'
+                        }
+                    });
+                    var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
+                    var registrationIds = [];
+                    registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
+                    //registrationIds.push(regId);
+                    sender.send(message,registrationIds,2,function(err,result){
+                        if(err){
+                            console.error(err);
+                        }
+                        else{
+                            console.log(result);
+                            res.json({message:'Yaay, he should have received a message by now'})
+                        }
+                    })
+                }
             })
     }
 
