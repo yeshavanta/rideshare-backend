@@ -263,6 +263,7 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
     var todayOrTomo = req.body.timeChoice;
     var dateToday = moment().format('YYYY-MM-DD');
     var nextDay = moment().add(1,'d').format('YYYY-MM-DD');
+    console.log('dateToday is: '+dateToday+' nextday is: '+nextDay);
     if(todayOrTomo === 'today'){
         Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T00:00:00.000Z'},jrId:0,source:source,destination:dest},function(err,rides){
             if(err){
