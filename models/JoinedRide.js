@@ -8,12 +8,12 @@ it will have customer objects with their profiles
 var db = require('../db');
 
 var joinedRide = db.model('joinedRide',{
-    ownerCustomerNumber:Number,
+    ownerCustomerNumber:Object,
     jrId:Number,
-    customers:Array,
     counter:Number,
     partners:Array,
-    status:String
+    status:String,
+    originalRideId:Number
 });
 
 

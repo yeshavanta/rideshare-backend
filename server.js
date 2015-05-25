@@ -8,7 +8,7 @@ var Customer = require('./models/Customer');
 var Ride = require('./models/Ride');
 var bcrypt = require('bcrypt');
 var jwt = require('jwt-simple');
-var secretkey = 'yeshavantagiridhar';
+var secretkey = 'fuckoffgiridharusmugbastard';
 var moment = require('moment');
 var JoinedRide = require('./models/JoinedRide');
 var gcm = require('node-gcm');
@@ -220,7 +220,8 @@ app.post('/postRide',ensureAuthorized,function(req,res,next){
         source:source,
         destination:destination,
         phoneNumber:phoneNumber,
-        date:date
+        date:date,
+		jrId:0
     });
 
     Ride.find({
@@ -263,7 +264,7 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
     var dateToday = moment().format('YYYY-MM-DD');
     var nextDay = moment().add(1,'d').format('YYYY-MM-DD');
     if(todayOrTomo === 'today'){
-        Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T00:00:00.000Z'},source:source,destination:dest},function(err,rides){
+        Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T00:00:00.000Z'},jrId:0,source:source,destination:dest},function(err,rides){
             if(err){
                 res.json({failure:'Some error while retrieving the rides for today'});
                 console.log('Some error while retrieving the rides for this day');
@@ -273,14 +274,17 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
                     if(err){
                         console.log('Error happened when retrieving joined rides from database');
                         res.json({failure:'failure',message:''})
-                    } if(jRides.length > 0){
+                    }
+                    if(jRides.length > 0){
                         res.json({success:'success',rides:rides,jRides:jRides});
+                    }else{
+                        res.json({success:'success',rides:rides});
                     }
                 });
             }
         })
     }else if(todayOrTomo === 'tomorrow'){
-        Ride.find({date:{'$gte':nextDay+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'},source:source,destination:dest},function(err,rides){
+        Ride.find({date:{'$gte':nextDay+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'},jrId:0,source:source,destination:dest},function(err,rides){
             if(err){
                 res.json({failure:'Some error while retrieving the rides for tomo'});
                 console.log('Some error while retrieving the rides for this day');
@@ -292,12 +296,14 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
                         res.json({failure:'failure',message:''})
                     } if(jRides.length > 0){
                         res.json({success:'success',rides:rides,jRides:jRides});
+                    }else{
+                        res.json({success:'success',rides:rides});
                     }
                 });
             }
         })
     }else if(todayOrTomo === 'both'){
-        Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'},source:source,destination:dest},function(err,rides){
+        Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'},jrId:0,source:source,destination:dest},function(err,rides){
             if(err){
                 res.json({failure:'Some error while retrieving the rides for both today and tomo'});
                 console.log('Some error while retrieving the rides for this day');
@@ -309,6 +315,8 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
                         res.json({failure:'failure',message:''})
                     } if(jRides.length > 0){
                         res.json({success:'success',rides:rides,jRides:jRides});
+                    }else{
+                        res.json({success:'success',rides:rides});
                     }
                 });
             }
@@ -331,7 +339,7 @@ app.post('/getMyRides',function(req,res,next){
     var currentTime = moment().format('HH:mm:ss');
     var currentDateTimeString = currentDate+'T'+currentTime+'.000Z';
     var nextDayDate = moment().add(1,'d').format('YYYY-MM-DD');
-    Ride.find({date:{'$gte':currentDateTimeString,'$lt':nextDayDate+'T23:59:59.000Z'},customerNumber:customerNumber},function(err,rides){
+    Ride.find({date:{'$gte':currentDateTimeString,'$lt':nextDayDate+'T23:59:59.000Z'},jrId:0,customerNumber:customerNumber},function(err,rides){
        if(err){
            console.log('There was an error while retrieving rides from database');
            res.sendStatus(500);
@@ -375,11 +383,14 @@ app.post('/removeAllCustomers',function(req,res,next){
 })
 
 /*
-rideId:rideId(This can be a ride ID or a joined Ride id
-rideFlag: This flag is to tell whether the above ID is a rideId or a jrId
-ownerCustomerNumber: The customerNumber of the owner of the ride
-rRideId:The ride Id of the ride of which the customer is sending the request
- */
+{
+	rideId:rideId(This can be a ride ID or a joined Ride id the one that the requester sees in the search results.
+	rideFlag: This flag is to tell whether the above ID is a rideId or a jrId
+	ownerCustomerNumber: The customerNumber of the owner of the ride
+	requestingCustomerNumber: The requesting customer's customerNUmber
+	rRideId:The ride Id of the ride of which the customer is sending the request
+}
+*/
 app.post('/sendRequestToJoinTheRideOrJoinedRide',function(req,res,next){
     var ownerCustomerNumber = req.body.ownerCustomerNumber;
     //Ideally this will come from the token, but for now take it as if its coming from request
@@ -389,7 +400,7 @@ app.post('/sendRequestToJoinTheRideOrJoinedRide',function(req,res,next){
     var rideFlag = req.body.rideFlag;
     var requestersRideId = req.body.rRideId;
     //Send a notification to the owner who has posted the ride
-    Customer.find({customerNumber:{$in:[ownerCustomerNumber,requestingCustomerNumber]}},function(err,customers){
+    Customer.find({customerNumber:{'$in':[ownerCustomerNumber,requestingCustomerNumber]}},function(err,customers){
         var requester = {};
         var owner = {};
         var requestersRide = {};
@@ -397,23 +408,23 @@ app.post('/sendRequestToJoinTheRideOrJoinedRide',function(req,res,next){
             console.log('Some error happened when the customers were being queried')
             res.sendStatus(500);
         } else if(customers.length > 0){
-            if(customers[0].customerNumber === requestingCustomerNumber){
+            if(customers[0].customerNumber == requestingCustomerNumber){
                 requester = customers[0];
                 owner = customers[1];
-            }else if(customer[0].customerNumber === ownerCustomerNumber){
+            }else if(customers[0].customerNumber == ownerCustomerNumber){
                 requester = customers[1];
                 owner = customers[0];
             }else{
                 console.log('Some shit happened when the customers were being queried')
                 res.sendStatus(500);
             }
-
+			console.log('about to make the ride call to db');
             Ride.findOne({rideId:requestersRideId},function(err,rRide){
                 if(err){
                     res.sendStatus(500);
                     console.log('Shit happened while retrieving the requesters ride ride from DB');
                 }
-                if(rRide.length == 1){
+                if(rRide!==null){
                     requestersRide = rRide;
                     if(rideFlag === 'jride'){
                         JoinedRide.fineOne({jrId:rideId},function(err,joinedRide){
@@ -421,6 +432,8 @@ app.post('/sendRequestToJoinTheRideOrJoinedRide',function(req,res,next){
                                 res.sendStatus(500);
                             }else if(joinedRide.length > 0){
                                 var regId = owner.gcmRegId;
+                                requester.id=null;
+                                requester.password=null;
                                 var message = new gcm.Message({
                                     collapseKey: 'demo',
                                     delayWhileIdle: true,
@@ -428,25 +441,34 @@ app.post('/sendRequestToJoinTheRideOrJoinedRide',function(req,res,next){
                                     data: {
                                         NotificationType: 'request to join the ride',
                                         requestingCustomer: requester,
-                                        requestersRide:requestersRide
+                                        requestersRide:requestersRide,
+                                        ownersrideid:rideId,
+                                        rideFlag:rideFlag
                                     }
                                 });
                                 var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
                                 var registrationIds = [];
-                                //registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
-                                registrationIds.push(regId);
+                                registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
+                                //registrationIds.push(regId);
                                 sender.send(message,registrationIds,2,function(err,result){
-                                    if(err) console.error(err);
-                                    else    console.log(result);
+                                    if(err){
+                                        console.error(err);
+                                    }
+                                    else{
+                                        console.log(result);
+                                        res.json({message:'Yaay, he should have received a message by now'})
+                                    }
                                 })
                             }
                         })
                     }else if(rideFlag === 'ride'){
-                        Ride.fineOne({rideId:rideId},function(err,ride){
+                        Ride.findOne({rideId:rideId},function(err,ride){
                             if(err){
                                 res.sendStatus(500);
-                            }else if(ride.length > 0){
+                            }else if(ride!==null || ride !== undefined){
                                 var regId = owner.gcmRegId;
+                                requester.id=null;
+                                requester.password=null;
                                 var message = new gcm.Message({
                                     collapseKey: 'demo',
                                     delayWhileIdle: true,
@@ -454,16 +476,23 @@ app.post('/sendRequestToJoinTheRideOrJoinedRide',function(req,res,next){
                                     data: {
                                         NotificationType: 'request to join the ride',
                                         requestingCustomer: requester,
-                                        requestersRide:requestersRide
+                                        requestersRide:requestersRide,
+                                        ownersrideid:rideId,
+                                        rideFlag:rideFlag
                                     }
                                 });
                                 var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
                                 var registrationIds = [];
-                                //registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
-                                registrationIds.push(regId);
+                                registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
+                                //registrationIds.push(regId);
                                 sender.send(message,registrationIds,2,function(err,result){
-                                    if(err) console.error(err);
-                                    else    console.log(result);
+                                    if(err){
+                                        console.error(err);
+                                    }
+                                    else{
+                                        console.log(result);
+                                        res.json({message:'Yaay, he should have received a message by now'})
+                                    }
                                 })
                             }
 
@@ -480,6 +509,126 @@ app.post('/sendRequestToJoinTheRideOrJoinedRide',function(req,res,next){
 
 
 
+
+/*
+Here the owner of the ride is accepting the request made by a random requester
+Steps involved are
+1. If a joined ride already exists, the requester is added to the joined ride
+2. If the joined ride does not exist, a new joined Ride is created
+3. The requester is updated that the owner has accepted his request to join the ride
+ */
+app.post('/acceptTheRequestToJoin',function(req,res,next){
+    var rideId = req.body.rideId;
+    var rideFlag = req.body.rideFlag;
+    var ownerCustomerNumber = req.body.ownerCustomerNumber; // this is obtained from the token
+    var requesterCustomerNumber = req.body.requesterCustomerNumber;
+    var owner = {};
+    var requester = {};
+    Customer.find({customerNumber:{'$in':[ownerCustomerNumber,requesterCustomerNumber]}},function(err,customers){
+        if(err){
+            console.log('Some shit happened while retrieving the customers from the database');
+            res.sendStatus(500);
+        }else if(customers.length > 0){
+            if(customers[0].customerNumber == ownerCustomerNumber){
+                owner = customers[0];
+                requester = customers[1];
+            }else if(customers[1].customerNumber == ownerCustomerNumber){
+                owner = customers[1];
+                requester = customers[0];
+            }
+
+         if(rideFlag == 'ride'){
+            // create a new jride with necessary details
+             var jrId = getUniqueId(32);
+             var partners = [];
+             var partner = {};
+             partner.customerNumber = requester.customerNumber;
+             partner.gcmId = requester.gcmId;
+             partners.push(partner);
+             var ownerDetails = {};
+             ownerDetails.customerNumber = owner.customerNumber;
+             ownerDetails.gcmId = owner.gcmId;
+             partners.push(ownerDetails);
+             var joinedRide = new JoinedRide({
+                 ownerCustomerNumber:ownerDetails,
+                 jrId:jrId,
+                 counter:0,
+                 status:'NotStarted',
+                 partners:partners,
+                 originalRideId:rideId
+             });
+
+             joinedRide.save(function(err,jride){
+                 if(err){
+                     res.sendStatus(500);
+                     console.log('Some error while saving the jride')
+                 }else if(jride !== null || jride !==undefined){
+                     // jrideId in the field of the ride must be updated
+                     var regId = requester.gcmRegId;
+                     var message = new gcm.Message({
+                         collapseKey: 'demo',
+                         delayWhileIdle: true,
+                         timeToLive: 3,
+                         data: {
+                             NotificationType: 'request to join the ride is accepted by owner',
+                             message:'The owner has accepted your request to join'
+                         }
+                     });
+					 
+					 Ride.update({rideId:rideId},{jrId:jrId},function(err,numberOfAffected,raw){
+							if(err){
+								console.log('error while updating the ride with a new jrId');
+								res.json(500);
+							}else if(numberOfAffected != 0){
+								var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
+								var registrationIds = [];
+								registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
+								//registrationIds.push(regId);
+								sender.send(message,registrationIds,2,function(err,result){
+									if(err){
+										console.error(err);
+									}
+									else{
+										console.log(result);
+										res.json({message:'Yaay, he should have received a message by now'})
+									}
+								})
+							}
+					 });
+                     
+                 }
+            })
+         }else if(rideFlag == 'jride'){
+            // use the ride id to open a jride and just update the contents
+			var partner = {};
+			partner.customerNumber = requester.customerNumber;
+			partner.gcmId = requester.gcmId;
+			JoinedRide.update({jrId:jrId},{"$push":{partners:partner}},function(err,numberAffected,raw){
+				if(err){
+					console.log('There was a shit error while updating the jride from the database');
+					res.json(500);
+				} else if(numberAffected != 0){
+					res.json({success:'The joined Ride is updated successfully'});
+				}
+			});
+         }else{
+             res.json({message:'you have sent the rideFlad wrong, the value u sent does not match with any of the existing values'});
+             console.log('you have sent the rideFlad wrong, the value u sent does not match with any of the existing values')
+         }
+        }
+    })
+})
+
+/*
+
+ */
+app.post('/startRide',function(req,res,next){
+
+});
+
+app.post('/endRide',function(req,res,next){
+
+})
 
 
 

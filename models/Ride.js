@@ -11,7 +11,8 @@ var ride = db.model('Ride',{
     phoneNumber:String,
     rideId:Number,
     date:Date,
-    status:String
+    status:String,
+    jrId:Number
 });
 
 module.exports = ride;
