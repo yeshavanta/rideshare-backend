@@ -258,6 +258,8 @@ app.post('/postRide',ensureAuthorized,function(req,res,next){
  }
 */
 app.post('/getRides',ensureAuthorized,function(req,res,next){
+    var decodedToken = getDecodedXAuthTokenFromHeader(req);
+    var customerNumber = decodedToken.customerNumber;
     var source = req.body.source;
     var dest = req.body.destination;
     var todayOrTomo = req.body.timeChoice;
@@ -265,7 +267,7 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
     var nextDay = moment().add(1,'d').format('YYYY-MM-DD');
     console.log('dateToday is: '+dateToday+' nextday is: '+nextDay);
     if(todayOrTomo === 'today'){
-        Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T00:00:00.000Z'},jrId:0,source:source,destination:dest},function(err,rides){
+        Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T00:00:00.000Z'},customerNumber:{'$ne':customerNumber},jrId:0,source:source,destination:dest},function(err,rides){
             if(err){
                 res.json({failure:'Some error while retrieving the rides for today'});
                 console.log('Some error while retrieving the rides for this day');
