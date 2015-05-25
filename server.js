@@ -270,7 +270,7 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
                 res.json({failure:'Some error while retrieving the rides for today'});
                 console.log('Some error while retrieving the rides for this day');
             }else if(rides){
-                console.log('Rides are successfully being returned');
+                console.log('Rides are successfully being returned for today are: '+rides);
                 JoinedRide.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T00:00:00.000Z'},source:source,destination:dest},function(err,jRides){
                     if(err){
                         console.log('Error happened when retrieving joined rides from database');
