@@ -287,7 +287,7 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
             }
         })
     }else if(todayOrTomo === 'tomorrow'){
-        Ride.find({date:{'$gte':nextDay+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'},jrId:0,source:source,destination:dest},function(err,rides){
+        Ride.find({date:{'$gte':nextDay+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'},customerNumber:{'$ne':customerNumber},jrId:0,source:source,destination:dest},function(err,rides){
             if(err){
                 res.json({failure:'Some error while retrieving the rides for tomo'});
                 console.log('Some error while retrieving the rides for this day');
@@ -306,7 +306,7 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
             }
         })
     }else if(todayOrTomo === 'both'){
-        Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'},jrId:0,source:source,destination:dest},function(err,rides){
+        Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T23:59:59.000Z'},customerNumber:{'$ne':customerNumber},jrId:0,source:source,destination:dest},function(err,rides){
             if(err){
                 res.json({failure:'Some error while retrieving the rides for both today and tomo'});
                 console.log('Some error while retrieving the rides for this day');
@@ -519,107 +519,120 @@ Steps involved are
 1. If a joined ride already exists, the requester is added to the joined ride
 2. If the joined ride does not exist, a new joined Ride is created
 3. The requester is updated that the owner has accepted his request to join the ride
+{
+    rideId:rideId of the owner's ride
+    rideFlag:whether this ride is a ride or joinedride
+    requestingCustomerNumber: requesting customer number
+    status:accept/reject
+}
  */
 app.post('/acceptTheRequestToJoin',function(req,res,next){
     var rideId = req.body.rideId;
     var rideFlag = req.body.rideFlag;
     var ownerCustomerNumber = req.body.ownerCustomerNumber; // this is obtained from the token
-    var requesterCustomerNumber = req.body.requesterCustomerNumber;
+    var requesterCustomerNumber = req.body.requestingCustomerNumber;
     var owner = {};
     var requester = {};
-    Customer.find({customerNumber:{'$in':[ownerCustomerNumber,requesterCustomerNumber]}},function(err,customers){
-        if(err){
-            console.log('Some shit happened while retrieving the customers from the database');
-            res.sendStatus(500);
-        }else if(customers.length > 0){
-            if(customers[0].customerNumber == ownerCustomerNumber){
-                owner = customers[0];
-                requester = customers[1];
-            }else if(customers[1].customerNumber == ownerCustomerNumber){
-                owner = customers[1];
-                requester = customers[0];
+    if(status === 'accept'){
+        Customer.find({customerNumber:{'$in':[ownerCustomerNumber,requesterCustomerNumber]}},function(err,customers){
+            if(err){
+                console.log('Some shit happened while retrieving the customers from the database');
+                res.sendStatus(500);
+            }else if(customers.length > 0){
+                if(customers[0].customerNumber == ownerCustomerNumber){
+                    owner = customers[0];
+                    requester = customers[1];
+                }else if(customers[1].customerNumber == ownerCustomerNumber){
+                    owner = customers[1];
+                    requester = customers[0];
+                }
+
+                if(rideFlag == 'ride'){
+                    // create a new jride with necessary details
+                    var jrId = getUniqueId(32);
+                    var partners = [];
+                    var partner = {};
+                    partner.customerNumber = requester.customerNumber;
+                    partner.gcmId = requester.gcmId;
+                    partners.push(partner);
+                    var ownerDetails = {};
+                    ownerDetails.customerNumber = owner.customerNumber;
+                    ownerDetails.gcmId = owner.gcmId;
+                    partners.push(ownerDetails);
+                    var joinedRide = new JoinedRide({
+                        ownerCustomerNumber:ownerDetails,
+                        jrId:jrId,
+                        counter:0,
+                        status:'NotStarted',
+                        partners:partners,
+                        originalRideId:rideId
+                    });
+
+                    joinedRide.save(function(err,jride){
+                        if(err){
+                            res.sendStatus(500);
+                            console.log('Some error while saving the jride')
+                        }else if(jride !== null || jride !==undefined){
+                            // jrideId in the field of the ride must be updated
+                            var regId = requester.gcmRegId;
+                            var message = new gcm.Message({
+                                collapseKey: 'demo',
+                                delayWhileIdle: true,
+                                timeToLive: 3,
+                                data: {
+                                    NotificationType: 'request to join the ride is accepted by owner',
+                                    message:'The owner has accepted your request to join'
+                                }
+                            });
+
+                            Ride.update({rideId:rideId},{jrId:jrId},function(err,numberOfAffected,raw){
+                                if(err){
+                                    console.log('error while updating the ride with a new jrId');
+                                    res.json(500);
+                                }else if(numberOfAffected != 0){
+                                    var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
+                                    var registrationIds = [];
+                                    registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
+                                    //registrationIds.push(regId);
+                                    sender.send(message,registrationIds,2,function(err,result){
+                                        if(err){
+                                            console.error(err);
+                                        }
+                                        else{
+                                            console.log(result);
+                                            res.json({message:'Yaay, he should have received a message by now'})
+                                        }
+                                    })
+                                }
+                            });
+
+                        }
+                    })
+                }else if(rideFlag == 'jride'){
+                    // use the ride id to open a jride and just update the contents
+                    var partner = {};
+                    partner.customerNumber = requester.customerNumber;
+                    partner.gcmId = requester.gcmId;
+                    JoinedRide.update({jrId:jrId},{"$push":{partners:partner}},function(err,numberAffected,raw){
+                        if(err){
+                            console.log('There was a shit error while updating the jride from the database');
+                            res.json(500);
+                        } else if(numberAffected != 0){
+                            res.json({success:'The joined Ride is updated successfully'});
+                        }
+                    });
+                }else{
+                    res.json({message:'you have sent the rideFlad wrong, the value u sent does not match with any of the existing values'});
+                    console.log('you have sent the rideFlad wrong, the value u sent does not match with any of the existing values')
+                }
             }
+        })
+    }else{
+            Customer.findOne({customerNumber:requesterCustomerNumber},function(){
 
-         if(rideFlag == 'ride'){
-            // create a new jride with necessary details
-             var jrId = getUniqueId(32);
-             var partners = [];
-             var partner = {};
-             partner.customerNumber = requester.customerNumber;
-             partner.gcmId = requester.gcmId;
-             partners.push(partner);
-             var ownerDetails = {};
-             ownerDetails.customerNumber = owner.customerNumber;
-             ownerDetails.gcmId = owner.gcmId;
-             partners.push(ownerDetails);
-             var joinedRide = new JoinedRide({
-                 ownerCustomerNumber:ownerDetails,
-                 jrId:jrId,
-                 counter:0,
-                 status:'NotStarted',
-                 partners:partners,
-                 originalRideId:rideId
-             });
-
-             joinedRide.save(function(err,jride){
-                 if(err){
-                     res.sendStatus(500);
-                     console.log('Some error while saving the jride')
-                 }else if(jride !== null || jride !==undefined){
-                     // jrideId in the field of the ride must be updated
-                     var regId = requester.gcmRegId;
-                     var message = new gcm.Message({
-                         collapseKey: 'demo',
-                         delayWhileIdle: true,
-                         timeToLive: 3,
-                         data: {
-                             NotificationType: 'request to join the ride is accepted by owner',
-                             message:'The owner has accepted your request to join'
-                         }
-                     });
-					 
-					 Ride.update({rideId:rideId},{jrId:jrId},function(err,numberOfAffected,raw){
-							if(err){
-								console.log('error while updating the ride with a new jrId');
-								res.json(500);
-							}else if(numberOfAffected != 0){
-								var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
-								var registrationIds = [];
-								registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
-								//registrationIds.push(regId);
-								sender.send(message,registrationIds,2,function(err,result){
-									if(err){
-										console.error(err);
-									}
-									else{
-										console.log(result);
-										res.json({message:'Yaay, he should have received a message by now'})
-									}
-								})
-							}
-					 });
-                     
-                 }
             })
-         }else if(rideFlag == 'jride'){
-            // use the ride id to open a jride and just update the contents
-			var partner = {};
-			partner.customerNumber = requester.customerNumber;
-			partner.gcmId = requester.gcmId;
-			JoinedRide.update({jrId:jrId},{"$push":{partners:partner}},function(err,numberAffected,raw){
-				if(err){
-					console.log('There was a shit error while updating the jride from the database');
-					res.json(500);
-				} else if(numberAffected != 0){
-					res.json({success:'The joined Ride is updated successfully'});
-				}
-			});
-         }else{
-             res.json({message:'you have sent the rideFlad wrong, the value u sent does not match with any of the existing values'});
-             console.log('you have sent the rideFlad wrong, the value u sent does not match with any of the existing values')
-         }
-        }
-    })
+    }
+
 })
 
 /*
