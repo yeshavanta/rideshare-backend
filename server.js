@@ -10,10 +10,12 @@ var bcrypt = require('bcrypt');
 var jwt = require('jwt-simple');
 var secretkey = 'yeshavantagiridhar';
 var moment = require('moment');
+var mtimezone = require('moment-timezone');
 var JoinedRide = require('./models/JoinedRide');
 var gcm = require('node-gcm');
 var jsonwebtoken = require('jsonwebtoken');
 var https = require('https');
+
 
 app.use(require('body-parser').json());
 app.use(function(req,res,next){
@@ -263,8 +265,9 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
     var source = req.body.source;
     var dest = req.body.destination;
     var todayOrTomo = req.body.timeChoice;
-    var dateToday = moment().format('YYYY-MM-DD');
-    var nextDay = moment().add(1,'d').format('YYYY-MM-DD');
+    var tempmoment = moment().utcOffset("+05:30");
+    var dateToday = tempmoment().format('YYYY-MM-DD');
+    var nextDay = tempmoment().add(1,'d').format('YYYY-MM-DD');
     console.log('dateToday is: '+dateToday+' nextday is: '+nextDay);
     if(todayOrTomo === 'today'){
         Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T00:00:00.000Z'},customerNumber:{'$ne':customerNumber},jrId:0,source:source,destination:dest},function(err,rides){
@@ -337,12 +340,13 @@ returns the rides for today and tomo which are yet to happen
 app.post('/getMyRides',function(req,res,next){
     var decodedToken = getDecodedXAuthTokenFromHeader(req);
     var customerNumber = decodedToken.customerNumber;
-    console.log('Received request to return the get Rides')
-    var currentDate = moment().format('YYYY-MM-DD');
-    var currentTime = moment().format('HH:mm:ss');
+    console.log('Received request to return the get Rides');
+    var tempmoment = moment().utcOffset("+05:30");
+    var currentDate = tempmoment().format('YYYY-MM-DD');
+    var currentTime = tempmoment().format('HH:mm:ss');
     var currentDateTimeString = currentDate+'T'+currentTime+'.000Z';
     console.log('CurrentdateTimeString is: '+currentDateTimeString);
-    var nextDayDate = moment().add(1,'d').format('YYYY-MM-DD');
+    var nextDayDate = tempmoment().add(1,'d').format('YYYY-MM-DD');
     Ride.find({date:{'$gte':currentDateTimeString,'$lt':nextDayDate+'T23:59:59.000Z'},jrId:0,customerNumber:customerNumber},function(err,rides){
        if(err){
            console.log('There was an error while retrieving rides from database');
@@ -634,7 +638,6 @@ app.post('/acceptOrRejectTheRequestToJoin',function(req,res,next){
                     console.log('There was an error while retrieving the customer from Db: '+err);
                     res.sendStatus(500);
                 }else if (customer.lenth > 0){
-
                     var message = new gcm.Message({
                         collapseKey: 'demo',
                         delayWhileIdle: true,
@@ -669,7 +672,13 @@ app.post('/acceptOrRejectTheRequestToJoin',function(req,res,next){
 
  */
 app.post('/startRide',function(req,res,next){
+    var json = {};
 
+    var momentnew;
+    momentnew = moment().utcOffset("+05:30");
+    json.utctime = momentnew.format();
+    json.usa = mtimezone.tz('America/New_York');
+    res.json({json:json});
 });
 
 app.post('/endRide',function(req,res,next){
