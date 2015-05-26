@@ -266,8 +266,8 @@ app.post('/getRides',ensureAuthorized,function(req,res,next){
     var dest = req.body.destination;
     var todayOrTomo = req.body.timeChoice;
     var tempmoment = moment().utcOffset("+05:30");
-    var dateToday = tempmoment().format('YYYY-MM-DD');
-    var nextDay = tempmoment().add(1,'d').format('YYYY-MM-DD');
+    var dateToday = tempmoment.format('YYYY-MM-DD');
+    var nextDay = tempmoment.add(1,'d').format('YYYY-MM-DD');
     console.log('dateToday is: '+dateToday+' nextday is: '+nextDay);
     if(todayOrTomo === 'today'){
         Ride.find({date:{'$gte':dateToday+'T00:00:00.000Z','$lt':nextDay+'T00:00:00.000Z'},customerNumber:{'$ne':customerNumber},jrId:0,source:source,destination:dest},function(err,rides){
@@ -342,11 +342,11 @@ app.post('/getMyRides',function(req,res,next){
     var customerNumber = decodedToken.customerNumber;
     console.log('Received request to return the get Rides');
     var tempmoment = moment().utcOffset("+05:30");
-    var currentDate = tempmoment().format('YYYY-MM-DD');
-    var currentTime = tempmoment().format('HH:mm:ss');
+    var currentDate = tempmoment.format('YYYY-MM-DD');
+    var currentTime = tempmoment.format('HH:mm:ss');
     var currentDateTimeString = currentDate+'T'+currentTime+'.000Z';
     console.log('CurrentdateTimeString is: '+currentDateTimeString);
-    var nextDayDate = tempmoment().add(1,'d').format('YYYY-MM-DD');
+    var nextDayDate = tempmoment.add(1,'d').format('YYYY-MM-DD');
     Ride.find({date:{'$gte':currentDateTimeString,'$lt':nextDayDate+'T23:59:59.000Z'},jrId:0,customerNumber:customerNumber},function(err,rides){
        if(err){
            console.log('There was an error while retrieving rides from database');
