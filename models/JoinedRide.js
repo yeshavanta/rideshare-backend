@@ -13,7 +13,8 @@ var joinedRide = db.model('joinedRide',{
     counter:Number,
     partners:Array,
     status:String,
-    originalRideId:Number
+    originalRideId:Number,
+    distanceMatrix:Object
 });
 
 

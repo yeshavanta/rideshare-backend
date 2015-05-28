@@ -393,7 +393,7 @@ app.post('/removeAllCustomers',function(req,res,next){
 /*
 {
 	rideId:rideId(This can be a ride ID or a joined Ride id the one that the requester sees in the search results.
-	rideFlag: This flag is to tell whether the above ID is a rideId or a jrId
+	rideFlag: This flag is to tell whether the above ID is a rideId or a jrId (ride/jride)
 	ownerCustomerNumber: The customerNumber of the owner of the ride
 	requestingCustomerNumber: The requesting customer's customerNUmber
 	rRideId:The ride Id of the ride of which the customer is sending the request
@@ -435,10 +435,10 @@ app.post('/sendRequestToJoinTheRideOrJoinedRide',function(req,res,next){
                 if(rRide!==null){
                     requestersRide = rRide;
                     if(rideFlag === 'jride'){
-                        JoinedRide.fineOne({jrId:rideId},function(err,joinedRide){
+                        JoinedRide.findOne({jrId:rideId},function(err,joinedRide){
                             if(err){
                                 res.sendStatus(500);
-                            }else if(joinedRide.length > 0){
+                            }else if(joinedRide != null){
                                 var regId = owner.gcmRegId;
                                 requester.id=null;
                                 requester.password=null;
@@ -532,10 +532,12 @@ Steps involved are
 }
  */
 app.post('/acceptOrRejectTheRequestToJoin',function(req,res,next){
+    var decodedToken = getDecodedXAuthTokenFromHeader(req);
+    var ownerCustomerNumber = decodedToken.customerNumber;
     var rideId = req.body.rideId;
     var rideFlag = req.body.rideFlag;
-    var ownerCustomerNumber = req.body.ownerCustomerNumber; // this is obtained from the token
     var requesterCustomerNumber = req.body.requestingCustomerNumber;
+    var status = req.body.status;
     var owner = {};
     var requester = {};
     if(status === 'accept'){
@@ -570,7 +572,8 @@ app.post('/acceptOrRejectTheRequestToJoin',function(req,res,next){
                         counter:0,
                         status:'NotStarted',
                         partners:partners,
-                        originalRideId:rideId
+                        originalRideId:rideId,
+                        distanceMatrix:null
                     });
 
                     joinedRide.save(function(err,jride){
@@ -610,7 +613,6 @@ app.post('/acceptOrRejectTheRequestToJoin',function(req,res,next){
                                     })
                                 }
                             });
-
                         }
                     })
                 }else if(rideFlag == 'jride'){
@@ -618,7 +620,7 @@ app.post('/acceptOrRejectTheRequestToJoin',function(req,res,next){
                     var partner = {};
                     partner.customerNumber = requester.customerNumber;
                     partner.gcmId = requester.gcmId;
-                    JoinedRide.update({jrId:jrId},{"$push":{partners:partner}},function(err,numberAffected,raw){
+                    JoinedRide.update({jrId:rideId},{"$push":{partners:partner}},function(err,numberAffected,raw){
                         if(err){
                             console.log('There was a shit error while updating the jride from the database');
                             res.json(500);
@@ -669,146 +671,118 @@ app.post('/acceptOrRejectTheRequestToJoin',function(req,res,next){
 })
 
 /*
+{
+ jrId:joined ride id
+}
 
  */
 app.post('/startRide',function(req,res,next){
-    var json = {};
+    var decodedToken = getDecodedXAuthTokenFromHeader(req);
+    var customerNumberFromToken = decodedToken.customerNumber;
 
-    var momentnew;
-    momentnew = moment().utcOffset("+05:30");
-    json.utctime = momentnew.format();
-    json.usa = mtimezone.tz('America/New_York');
-    res.json({json:json});
+    var joinedRideId = req.body.jrId;
+    JoinedRide.findOne({jrId:joinedRideId},function(err,joinedRide){
+        if(err){
+            console.log('There was an error while retrieving the joined ride from the database');
+            res.sendStatus(500);
+        }else if(joinedRide!=null){
+            var counter = joinedRide.counter;
+            counter = counter +1;
+            JoinedRide.update({jrId:joinedRideId},{counter:counter,status:'started'},function(err,numberAffected){
+                if(err){
+                    console.log('Some shit happened while updating the joined ride');
+                    res.sendStatus(500);
+                }else if(numberAffected > 0){
+                    console.log('The number affected while updating the counter for the joined ride is '+numberAffected);
+                    if(counter > 1){
+                        /*
+                            I have to send notifications to all the members to send the distances travelled so far,
+                            so that i can add it to my measuring algorithm.
+                            if counter >1, it means that this request to start ride is being sent by person who is
+                            not the not the first one, so in this case, we have measure the distance travelled so far
+                            and update the hashmap called DistanceMatrix, so that we can keep track of commonly travelled
+                            kms.
+                         */
+                        //var partners = [];
+                        var registrationIds = [];
+                        var partners = joinedRide.partners;
+                        for(var index=0;index<partners.length;index++){
+                            var partner = partners[index];
+                            registrationIds.push(partner.gcmId);
+                        }
+
+                        var message = new gcm.Message({
+                            collapseKey: 'demo',
+                            delayWhileIdle: true,
+                            timeToLive: 3,
+                            data: {
+                                NotificationType: 'DistanceTravelled',
+                                rideid:joinedRideId,
+                                message:'post the distance travelled so far'
+                            }
+                        });
+                        var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
+                        //registrationIds.push('APA91bEp4ge85-_h79M8Hw0AdcGOQKapuqdTTt9GYEDXm80b2aWaV1PX20iUzEWFJ1ZpQ-Sjiw5mazwv3oEjXjoUtLHKijAP7UCzyuzmFaKSL-lpZz72-gSn5HUO79MkI_GtIzU0jx5V8YwJZ8a4mWg9S-DWdhEOZcvtW4B8jC3x6LmUYYg7Ei0');
+                        //registrationIds.push(regId);
+                        sender.send(message,registrationIds,2,function(err,result){
+                            if(err){
+                                console.error(err);
+                            }
+                            else{
+                                console.log(result);
+                                res.json({message:'Yaay, he should have received a message by now'})
+                            }
+                        })
+                    }else{
+                        res.json({message:'the ride is started'})
+                    }
+                }
+            })
+        }
+    })
 });
 
-app.post('/endRide',function(req,res,next){
-
-})
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /*
-This api must be called when you are creating the ride
-customers:Array of customers
+{
+ jrId:joined ride id
+ distanceTravelled:distance travelled in kilometres.
+}
  */
-app.post('/createJoinedRide',function(req,res,next){
-    var jrId = getUniqueId(32);
-    var customers = req.body.customers;
-    var joinedRide = new JoinedRide({
-        jrId:jrId,
-        customers:customers,
-        counter:0
-    });
-
-    joinedRide.save(function(err,joinedride){
+app.post('/updateDistanceTravelled',function(req,res,next){
+    var decodedToken = getDecodedXAuthTokenFromHeader(req);
+    var customerNumber = decodedToken.customerNumber;
+    var joinedRideId = req.body.jrId;
+    var distanceTravelled = req.body.distanceTravelled;
+    JoinedRide.findOne({jrId:joinedRideId},function(err,joinedRide){
         if(err){
+            console.log('There was an error while retrieving the joined ride from the database for updateDistanceTravelled');
             res.sendStatus(500);
-            console.log('Error in saving the joined ride, please try again later');
-        }else if(joinedride){
-            console.log('Successfully saved the joined ride, now returning the id')
-            res.json({joinedRideId:jrId});
-            /*
-            must send the notifications to all the people who are in the customers list,
-            that you are invited to join this ride and can press on start when they are
-            about to start the journey
-             */
+        }else if(joinedRide != null){
+            var distanceMatrix = joinedRide.distanceMatrix;
+            var counter = joinedRide.counter - 1;
+            if(distanceMatrix == null) {
+                distanceMatrix = {};
+            }
+            if(distanceMatrix[customerNumber] == undefined){
+                distanceMatrix[customerNumber] = [];
+            }
+            var distanceObject = {};
+            distanceObject.distance = distanceTravelled;
+            distanceObject.partnerCount = counter;
+            distanceMatrix[customerNumber].push(distanceObject);
+            JoinedRide.update({jrId:joinedRideId},{distanceMatrix:distanceMatrix},function(err,numberAffected,raw){
+                if(err){
+                    console.log('There was a problem while updating the distance matrix in a joined ride');
+                    res.sendStatus(500);
+                }else if (numberAffected != 0){
+                    console.log('The number of rows affected while updating the distanceMatrix: '+numberAffected);
+                    res.json({message:'The data matrix is successfully updated'});
+                }
+            })
         }
     })
 })
 
-/*
-requestingCustomer:requesting customer id
-targetCustomer:target customer ID
-jrId: will have to send the joinedRide Id, once you have found
-rideId: send RideId till you find your first partner
- */
-app.post('/requestCustomerToJoinedRide',function(req,res,next){
-    /*
-    I should get the requesting customer ID fromt the
-     */
-    var requestingCustomer = req.body.requestingCustomer;
-    var targetCustomer = req.body.targetCustomer;
-    if(req.body.jrId === undefined){
-        var jrId = getUniqueId(32);
-        var customers = [];
-        customers.push(requestingCustomer);
-        var joinedRide = new JoinedRide({
-            jrId:jrId,
-            customers:customers,
-            counter:0
-        });
+app.post('/endRide',function(req,res,next){
 
-        joinedRide.save(function(err,joinedride){
-            if(err){
-                res.sendStatus(500);
-                console.log('Error in saving the joined ride, please try again later');
-            }else if(joinedride){
-                console.log('Successfully saved the joined ride, now returning the id')
-                res.json({joinedRideId:jrId});
-                /*
-                 must send the notifications to all the people who are in the customers list,
-                 that you are invited to join this ride and can press on start when they are
-                 about to start the journey
-                 */
-            }
-        })
-    }
-})
-
-/*
-jrId:jrId
-status:yes/no,
-requestingCustomer:customerNumber
- */
-app.post('/acceptTheJoinedRide',function(req,res,next){
-    var decodedToken = getDecodedXAuthTokenFromHeader(req);
-    var customerNumber = decodedToken.customerNumber;
-    if(status === 'yes'){
-        //I have to send notification to the users, and update the ride
-        JoinedRide.update({jrId:req.body.jrId},{"$push":{customers:customerNumber}},function(err,numberAffected,raw){
-            if(err){
-                console.log('Error while updating the main order',err);
-                res.sendStatus(500)
-            }else if(numberAffected != 0){
-                console.log('The number of rows affected are ',numberAffected);
-                res.sendStatus(200);
-            }
-        })
-    }
-    else if(status === 'No'){
-        // I have to send notification to the requesting customer that this person has refused your request
-        var regId = req.body.gcmRegId;
-        var message = new gcm.Message({
-            collapseKey: 'demo',
-            delayWhileIdle: true,
-            timeToLive: 3,
-            data: {
-                messageKey: 'Sorry the user has denied your ride'
-            }
-        });
-        var sender = new gcm.Sender('AIzaSyByCmHXrGS53IMCQpY6Vv_Csl0Yu7vb-P8');
-        var registrationIds = [];
-        registrationIds.push(regId);
-        sender.send(message,registrationIds,2,function(err,result){
-            if(err) console.error(err);
-            else    console.log(result);
-        })
-    }
 })
