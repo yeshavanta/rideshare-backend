@@ -68,6 +68,7 @@ function ensureAuthorized(req,res,next){
             res.json({failure:'Custmer does not exist please sign up'});
             console.log('Customer with customer number '+customerNumber+' does not exist');
         }else if(customer){
+            req.customer = customer;
             next();
         }
     })
@@ -785,4 +786,47 @@ app.post('/updateDistanceTravelled',function(req,res,next){
 
 app.post('/endRide',function(req,res,next){
 
+})
+
+/*
+    rideId:ride id,
+    rideFlag: ride flag (ride/jride)
+ */
+app.post('/getRideDetails',ensureAuthorized,function(req,res,next){
+    var decodedToken = getDecodedXAuthTokenFromHeader(req);
+    var rideId = req.body.rideId;
+    var rideFlag = req.body.rideFlag;
+
+    if(rideFlag == 'jride'){
+        JoinedRide.findOne({jrId:rideId},function(err,jride){
+            if(err){
+                console.log('There was an error while retrieving the details of joined Ride: '+err);
+                res.sendStatus(500);
+            }
+            else if(jride != null){
+                console.log('Successfully retrieved the joined ride');
+                res.json({joinedRide:jride});
+            }
+        })
+    }else if(rideFlag == 'ride'){
+        Ride.findOne({rideId:rideId},function(err,ride){
+            if(err){
+                console.log('There was an error while retrieving the details of Ride: '+err);
+                res.sendStatus(500);
+            }
+            else if(ride != null){
+                console.log('Successfully retrieved the ride');
+                Customer.findOne({customerNumber:ride.customerNumber},function(err,customer){
+                    if(err){
+                        console.log('There was an error while retrieving the details of joined Ride: '+err);
+                        res.sendStatus(500);
+                    }
+                    else if(customer != null){
+                        console.log('Successfully retrieved the customer');
+                        res.json({ride:ride,owner:customer});
+                    }
+                })
+            }
+        })
+    }
 })
