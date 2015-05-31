@@ -15,4 +15,5 @@ var ride = db.model('Ride',{
     jrId:Number
 });
 
+
 module.exports = ride;

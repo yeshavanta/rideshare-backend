@@ -13,5 +13,4 @@ var customer = db.model('Customer',{
     name:String
 });
 
-
 module.exports = customer;

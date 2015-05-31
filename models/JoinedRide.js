@@ -18,4 +18,6 @@ var joinedRide = db.model('joinedRide',{
 });
 
 
+
+
 module.exports = joinedRide;

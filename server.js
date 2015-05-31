@@ -784,14 +784,20 @@ app.post('/updateDistanceTravelled',function(req,res,next){
     })
 })
 
+/*
+    rideId:send the joined ride id here
+*/
 app.post('/endRide',function(req,res,next){
 
 })
 
 /*
-    rideId:ride id,
-    rideFlag: ride flag (ride/jride)
+   {
+        rideId:ride id,
+        rideFlag: ride flag (ride/jride)
+   }
  */
+
 app.post('/getRideDetails',ensureAuthorized,function(req,res,next){
     var decodedToken = getDecodedXAuthTokenFromHeader(req);
     var rideId = req.body.rideId;
