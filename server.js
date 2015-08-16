@@ -49,6 +49,7 @@ function getUniqueId(bits){
         return number;
     }
 }
+
 /*
  returns decoded token by extracting the token from header
  */
