@@ -27,7 +27,7 @@ app.use(function(req,res,next){
 });
 app.use(express.static(__dirname + '/public'));
 
-app.listen(8080,function(){
+app.listen(3000,function(){
    console.log('Listening to server on port 3000');
 });
 
