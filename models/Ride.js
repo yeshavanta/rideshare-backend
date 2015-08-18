@@ -11,8 +11,24 @@ var ride = db.model('Ride',{
     phoneNumber:String,
     rideId:Number,
     date:Date,
-    status:String,
-    jrId:Number
+    status:{type:String,default:'notstarted'},
+    jrId:Number,
+    latlong:String,
+    requestMatrix:{type:Object,default:{}},
+    gender:String,
+    requests:Array,
+    sourceLat:Number,
+    sourceLng:Number,
+    destinationLat:Number,
+    destinationLng:Number,
+    pickUpLat:Number,
+    pickUpLng:Number,
+    dropLat:Number,
+    dropLng:Number,
+    city:String,
+    humanReadableNamesOfPickUpLatLng:String,
+    humanReadableNamesOfDropLatLng:String,
+    overview_polyline:String
 });
 
 

@@ -1,0 +1,62 @@
+Steps involved
+
+1. When u send a request to Join a ride/joinedride
+
+    a. obtain the customer profiles of requester and owner
+    b. retrieve a ride with the ride Id sent by the mobile app
+    c. now two cases, the rideId can be a rideId or a jrId. first assume its a rideId
+    if its a ride id:
+        1. Request Object: create and save a new request object
+        2. RequestMatrix: create the requestMatrix with fields rRideId, status('requestsent'), requestId
+        3. Ride: update the original ride with the requestMatrix, and also push the requestId to the array of requests in Ride.
+        4. send message
+    if its a joinedride:
+        1. Request Object: create and save a new request object
+        2. RequestMatrix: set the requestMatrix with the fields rRideId, status('requestsent'), requestId
+        3. JoinedRide: push the requestId to the array of requests in the JoinedRIde
+        4. send message
+
+2. when you are accepting or rejecting a request
+    case 1: Accepting the request
+         a. Retrieve the corresponding request Objects
+         b. retrieve the customer profiles of owner and requester
+         c. retrieve the rides of Ride and rRide
+         d. now two cases exist, one where a corresponding joinedride exists or maynot exist
+         case 1: Jride exists
+            a. RequestMatrix: update the joined ride's requestMatrix by updating the status to 'accepted'
+            b. Partners: create a new partner object with the fields customerNumber, gcmId, phoneNumber
+            c. Update the joined ride with the requestMatrix and Partners
+            d. Request Object: update the request object with the status as 'accepted' and also the joinedRide's ID(this is just for double checking)
+            e. Update the rRide with the jrId of the JoinedRide.
+            f. send message
+         case 2: Jride doesn exist
+            a. create a new jride.
+            b. requestMatrix: it will inherit the request matrix from the orignial ride, update the requestMatrix with the status to 'accepted'.
+            c. Ride and rRide: update the jride id into these
+            d. Request: update the request object status to 'accepted', update the requests in the requests array with the joinedride id.
+            e. send message
+
+    case 2: Rejecting the request
+         a. Retrieve the corresponding request object
+         b. retrieve the customer profile of the requester
+         c. retrieve the ride with the ownerrideid.
+         d. now there are two cases, the joinedride may or may not exist(when he is rejecting a request even before he has agreed to any new requests)
+         case 1: Jride exists
+            a. update the requestMatrix of the Jride
+            b. update the requestObject
+         case 2: Jride does not exist
+            a. update the requestMatrix of the ride
+            b. update the requestObject
+
+Request life cycle:
+             --> requestsent
+             --> accepted
+             --> rejected
+             --> exited
+             --> removed
+
+Ride and JoinedRide life cycle
+            --> notstarted
+            --> started
+            --> ended
+
