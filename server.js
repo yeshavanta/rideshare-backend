@@ -97,50 +97,20 @@ app.post('/signuplogin',function(req,res,next){
     var email = req.body.email;
     var profile = req.body.profile;
     console.log('Entere the signuplogin function');
-    Customer.findOne({email:email},function(err,customer){
-        if(err){
-            console.log('Error while retrieving the customer from the DB, in registerCustomer function');
-            res.sendStatus(500);
-        }else if(customer != null){
-            console.log('Fetched the Customer successfully from the DB');
-            var profileFromDB = customer.profile;
-            if(profileFromDB !== profile){
-                res.json({failure:'failure',data:"User has already signed up with this email id using the profile: "+profileFromDB});
-            }else{
-                if(profile == 'facebook'){
-                    console.log('Entered the profile == facebook condition');
-                    https.get('https://graph.facebook.com/app?access_token='+req.body.token,function(response){
-
-                        var body = '';
-                        response.on('data',function(d){
-                            body =body + d;
-                        })
-                        response.on('end',function(){
-                            console.log('Completely received the data '+body);
-                            var json = JSON.parse(body);
-                            if(json.error === undefined){
-                                if(json.name == 'foodpipe'){
-                                    var objectToBeEncoded = {};
-                                    objectToBeEncoded.name = customer.name;
-                                    objectToBeEncoded.customerNumber = customer.customerNumber;
-                                    objectToBeEncoded.email = customer.email;
-                                    objectToBeEncoded.iss ='foodpipe.in';
-                                    objectToBeEncoded.isMobile=1;
-                                    var token = jwt.encode(objectToBeEncoded,secretkey);
-                                    console.log('About to return the encrypted data back to customer from facebook conditon');
-                                    res.json({success:'success',token:token,data:customer});
-                                }
-                            }else{
-                                res.json({failure:'failure',data:'Unable to authenticate with the given token provided from you with facebook'})
-                            }
-                        })
-                    }).on('error',function(e){
-                        console.log('The shitty problem is: '+e);
-                    })
-                }else if( profile == 'google'){
-                    try{
-                        console.log('Entered the profile google');
-                        https.get('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token='+req.body.token,function(response){
+    try{
+        Customer.findOne({email:email},function(err,customer){
+            if(err){
+                console.log('Error while retrieving the customer from the DB, in registerCustomer function');
+                res.sendStatus(500);
+            }else if(customer != null){
+                console.log('Fetched the Customer successfully from the DB');
+                var profileFromDB = customer.profile;
+                if(profileFromDB !== profile){
+                    res.json({failure:'failure',data:"User has already signed up with this email id using the profile: "+profileFromDB});
+                }else{
+                    if(profile == 'facebook'){
+                        console.log('Entered the profile == facebook condition');
+                        https.get('https://graph.facebook.com/app?access_token='+req.body.token,function(response){
 
                             var body = '';
                             response.on('data',function(d){
@@ -150,93 +120,128 @@ app.post('/signuplogin',function(req,res,next){
                                 console.log('Completely received the data '+body);
                                 var json = JSON.parse(body);
                                 if(json.error === undefined){
-                                    if(json.email == customer.email && json.expires_in > 0){
+                                    if(json.name == 'foodpipe'){
                                         var objectToBeEncoded = {};
                                         objectToBeEncoded.name = customer.name;
                                         objectToBeEncoded.customerNumber = customer.customerNumber;
                                         objectToBeEncoded.email = customer.email;
                                         objectToBeEncoded.iss ='foodpipe.in';
                                         objectToBeEncoded.isMobile=1;
-                                        var gcmId = req.body.gcmId;
-                                        Customer.update({customerNumber:customer.customerNumber},{gmcId:gcmId},function(err,numberAffected,raw){
-                                            if(err){
-                                                console.log('Error happened while updating the GCM ID of the customer: '+err);
-                                                res.json({failure:'failure',message:'Error happened while updating the GCM ID of the customer'});
-                                            }else if(numberAffected != null){
-                                                var token = jwt.encode(objectToBeEncoded,secretkey);
-                                                console.log('About to return the encrypted data back to customer from google conditon');
-                                                res.json({success:'success',token:token,data:customer});
-                                            }
-                                        })
+                                        var token = jwt.encode(objectToBeEncoded,secretkey);
+                                        console.log('About to return the encrypted data back to customer from facebook conditon');
+                                        res.json({success:'success',token:token,data:customer});
                                     }
                                 }else{
-                                    res.json({failure:'failure',data:'Unable to authenticate with the given token provided from you with google'});
-                                    console.log('The error is: '+json.error_description);
+                                    res.json({failure:'failure',data:'Unable to authenticate with the given token provided from you with facebook'})
                                 }
                             })
                         }).on('error',function(e){
                             console.log('The shitty problem is: '+e);
                         })
-                    }catch(err){
-                        console.log('Error hapened in profile is google: '+err)
-                    }
-                }else{
-                    console.log('Entered the condition where the profile is local');
-                    bcrypt.compare(req.body.password,customer.password,function(err,valid){
-                        if(err){
-                            res.json({failure:'The user does not exist, please signup'});
+                    }else if( profile == 'google'){
+                        try{
+                            console.log('Entered the profile google');
+                            https.get('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token='+req.body.token,function(response){
+
+                                var body = '';
+                                response.on('data',function(d){
+                                    body =body + d;
+                                })
+                                response.on('end',function(){
+                                    console.log('Completely received the data '+body);
+                                    var json = JSON.parse(body);
+                                    if(json.error === undefined){
+                                        if(json.email == customer.email && json.expires_in > 0){
+                                            var objectToBeEncoded = {};
+                                            objectToBeEncoded.name = customer.name;
+                                            objectToBeEncoded.customerNumber = customer.customerNumber;
+                                            objectToBeEncoded.email = customer.email;
+                                            objectToBeEncoded.iss ='foodpipe.in';
+                                            objectToBeEncoded.isMobile=1;
+                                            var gcmId = req.body.gcmId;
+                                            Customer.update({customerNumber:customer.customerNumber},{gmcId:gcmId},function(err,numberAffected,raw){
+                                                if(err){
+                                                    console.log('Error happened while updating the GCM ID of the customer: '+err);
+                                                    res.json({failure:'failure',message:'Error happened while updating the GCM ID of the customer'});
+                                                }else if(numberAffected != null){
+                                                    var token = jwt.encode(objectToBeEncoded,secretkey);
+                                                    console.log('About to return the encrypted data back to customer from google conditon');
+                                                    res.json({success:'success',token:token,data:customer});
+                                                }
+                                            })
+                                        }
+                                    }else{
+                                        res.json({failure:'failure',data:'Unable to authenticate with the given token provided from you with google'});
+                                        console.log('The error is: '+json.error_description);
+                                    }
+                                })
+                            }).on('error',function(e){
+                                console.log('The shitty problem is: '+e);
+                            })
+                        }catch(err){
+                            console.log('Error hapened in profile is google: '+err)
                         }
-                        else if(!valid){
-                            res.json({failure:'The Username or password is not valid'});
+                    }else{
+                        console.log('Entered the condition where the profile is local');
+                        bcrypt.compare(req.body.password,customer.password,function(err,valid){
+                            if(err){
+                                res.json({failure:'The user does not exist, please signup'});
+                            }
+                            else if(!valid){
+                                res.json({failure:'The Username or password is not valid'});
+                            }else{
+                                console.log('About to send the information back to customer');
+                                var objectToBeEncoded = {};
+                                objectToBeEncoded.name = customer.name;
+                                objectToBeEncoded.customerNumber = customer.customerNumber;
+                                objectToBeEncoded.email = customer.email;
+                                objectToBeEncoded.iss ='foodpipe.in';
+                                objectToBeEncoded.isMobile=1;
+                                var token = jwt.encode(objectToBeEncoded,secretkey);
+                                res.json({token:token,data:customer});
+                            }
+                        });
+                    }
+                }
+            }else if(!customer){
+                console.log('Entered the condition where this is a new customer');
+                var customerNumber = getUniqueId(32);
+                var newCustomer = new Customer({
+                    name:name,
+                    customerNumber:customerNumber,
+                    profile:profile,
+                    email:email,
+                    gcmId:req.body.gcmId
+                });
+                bcrypt.hash(req.body.password,10,function(err,hash){
+                    newCustomer.password = hash;
+                    newCustomer.save(function(err,customer){
+                        if(err){
+                            console.log('Error while saving the new customer to DB');
+                            res.json({failure:'Error while saving the new customer to DB'});
                         }else{
-                            console.log('About to send the information back to customer');
+                            console.log('Successfully encrypted the password before storing it to the DB');
                             var objectToBeEncoded = {};
-                            objectToBeEncoded.name = customer.name;
-                            objectToBeEncoded.customerNumber = customer.customerNumber;
-                            objectToBeEncoded.email = customer.email;
+                            objectToBeEncoded.name = name;
+                            objectToBeEncoded.customerNumber = customerNumber;
+                            objectToBeEncoded.email = email;
                             objectToBeEncoded.iss ='foodpipe.in';
+                            objectToBeEncoded.exp =Date.now()+86400000;
                             objectToBeEncoded.isMobile=1;
+                            console.log('A Customer has been created with the following customer ID ',customerNumber);
                             var token = jwt.encode(objectToBeEncoded,secretkey);
                             res.json({token:token,data:customer});
                         }
-                    });
-                }
+                    })
+                });
+            }else{
+                res.json({data:'The email address is already registered'});
             }
-        }else if(!customer){
-            console.log('Entered the condition where this is a new customer');
-            var customerNumber = getUniqueId(32);
-            var newCustomer = new Customer({
-                name:name,
-                customerNumber:customerNumber,
-                profile:profile,
-                email:email,
-                gcmId:req.body.gcmId
-            });
-            bcrypt.hash(req.body.password,10,function(err,hash){
-                newCustomer.password = hash;
-                newCustomer.save(function(err,customer){
-                    if(err){
-                        console.log('Error while saving the new customer to DB');
-                        res.json({failure:'Error while saving the new customer to DB'});
-                    }else{
-                        console.log('Successfully encrypted the password before storing it to the DB');
-                        var objectToBeEncoded = {};
-                        objectToBeEncoded.name = name;
-                        objectToBeEncoded.customerNumber = customerNumber;
-                        objectToBeEncoded.email = email;
-                        objectToBeEncoded.iss ='foodpipe.in';
-                        objectToBeEncoded.exp =Date.now()+86400000;
-                        objectToBeEncoded.isMobile=1;
-                        console.log('A Customer has been created with the following customer ID ',customerNumber);
-                        var token = jwt.encode(objectToBeEncoded,secretkey);
-                        res.json({token:token,data:customer});
-                    }
-                })
-            });
-        }else{
-            res.json({data:'The email address is already registered'});
-        }
-    })
+        })
+    }catch(err){
+        console.log('The error happened in signuplogin function is: '+err);
+    }
+
 });
 
 /*
